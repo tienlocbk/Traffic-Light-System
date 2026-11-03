@@ -1,23 +1,23 @@
 # Build outputs
-Debug/
-Release/
-build/
+Traffic_STM32/Debug/
+Traffic_STM32/Release/
+Traffic_STM32/build/
 
 # STM32CubeIDE / Eclipse project files
-.project
-.cproject
-.settings/
+Traffic_STM32/.project
+Traffic_STM32/.cproject
+Traffic_STM32/.settings/
 .metadata/
 
 # Compiled object and binary files
-*.o
-*.d
-*.su
-*.cyclo
-*.elf
-*.hex
-*.bin
-*.map
+Traffic_STM32/**/*.o
+Traffic_STM32/**/*.d
+Traffic_STM32/**/*.su
+Traffic_STM32/**/*.cyclo
+Traffic_STM32/**/*.elf
+Traffic_STM32/**/*.hex
+Traffic_STM32/**/*.bin
+Traffic_STM32/**/*.map
 
 # OS generated files
 .DS_Store
