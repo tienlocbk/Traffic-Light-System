@@ -1,8 +1,24 @@
+# Build outputs
 Debug/
 Release/
+build/
+
+# STM32CubeIDE / Eclipse project files
+.project
+.cproject
+.settings/
+.metadata/
+
+# Compiled object and binary files
 *.o
 *.d
-*.elf
-*.map
 *.su
-.metadata/
+*.cyclo
+*.elf
+*.hex
+*.bin
+*.map
+
+# OS generated files
+.DS_Store
+Thumbs.db
