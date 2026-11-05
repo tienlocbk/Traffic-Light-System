@@ -4,8 +4,7 @@ Traffic_STM32/Release/
 Traffic_STM32/build/
 
 # STM32CubeIDE / Eclipse project files
-Traffic_STM32/.project
-Traffic_STM32/.cproject
+
 Traffic_STM32/.settings/
 .metadata/
 
