@@ -32,6 +32,19 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+/* Hardware test steps (from Section 3 of project guide):
+ * TEST_STEP_3_1: 3.1 Checking Program Flashing: Blink LED PA5
+ * TEST_STEP_3_2: 3.2 Determining Signal Combinations for Light Modules
+ * TEST_STEP_3_3: 3.3 Testing Buttons (BTN_1 to BTN_4, B1)
+ * TEST_STEP_3_4: 3.4 Scanning I2C Devices (DHT20 & LCD)
+ */
+#define TEST_STEP_3_1  1
+#define TEST_STEP_3_2  2
+#define TEST_STEP_3_3  3
+#define TEST_STEP_3_4  4
+
+/* >>> CHANGE THIS VALUE TO SWITCH TESTING STEP (1 to 4) <<< */
+#define TEST_STEP      TEST_STEP_3_1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,7 +60,9 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+/* Global variables for Step 3.4 I2C device scan (accessible in Live Expressions) */
+uint8_t found[8];
+int n = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -107,6 +122,72 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+#if (TEST_STEP == TEST_STEP_3_1)
+    /* ------------------------------------------------------------------
+     * Step 3.1: Checking Program Flashing: Blink LED PA5 (LD2)
+     * ------------------------------------------------------------------ */
+    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+    HAL_Delay(500);
+
+#elif (TEST_STEP == TEST_STEP_3_2)
+    /* ------------------------------------------------------------------
+     * Step 3.2: Determining the Signal Combinations for the Light Modules
+     * Cycles through (0,0), (0,1), (1,0), (1,1) holding each for 2 seconds
+     * for both Traffic Light module 1 (TL1) and module 2 (TL2).
+     * ------------------------------------------------------------------ */
+    for (int i = 0; i < 4; i++) {
+      HAL_GPIO_WritePin(TL1_A_GPIO_Port, TL1_A_Pin, (i >> 1) & 1);
+      HAL_GPIO_WritePin(TL1_B_GPIO_Port, TL1_B_Pin, i & 1);
+
+      HAL_GPIO_WritePin(TL2_A_GPIO_Port, TL2_A_Pin, (i >> 1) & 1);
+      HAL_GPIO_WritePin(TL2_B_GPIO_Port, TL2_B_Pin, i & 1);
+
+      HAL_Delay(2000);
+    }
+
+#elif (TEST_STEP == TEST_STEP_3_3)
+    /* ------------------------------------------------------------------
+     * Step 3.3: Testing the Buttons
+     * Read each button and show the result on LED PA5 (LD2).
+     * Turns LD2 ON when any button (BTN_1..4, B1) is pressed (RESET / 0).
+     * ------------------------------------------------------------------ */
+    if (HAL_GPIO_ReadPin(BTN_1_GPIO_Port, BTN_1_Pin) == GPIO_PIN_RESET ||
+        HAL_GPIO_ReadPin(BTN_2_GPIO_Port, BTN_2_Pin) == GPIO_PIN_RESET ||
+        HAL_GPIO_ReadPin(BTN_3_GPIO_Port, BTN_3_Pin) == GPIO_PIN_RESET ||
+        HAL_GPIO_ReadPin(BTN_4_GPIO_Port, BTN_4_Pin) == GPIO_PIN_RESET ||
+        HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
+    {
+      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+    }
+    else
+    {
+      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+    }
+
+#elif (TEST_STEP == TEST_STEP_3_4)
+    /* ------------------------------------------------------------------
+     * Step 3.4: Scanning I2C Devices
+     * Scans 7-bit addresses 1..127 on I2C1 for DHT20 and LCD.
+     * Found addresses are stored in the global 'found' array.
+     * Also blinks LD2 'n' times (e.g. 2 times) as immediate visual feedback.
+     * ------------------------------------------------------------------ */
+    n = 0;
+    for (uint8_t addr = 1; addr < 128; addr++) {
+      if (HAL_I2C_IsDeviceReady(&hi2c1, addr << 1, 1, 10) == HAL_OK) {
+        if (n < 8) found[n++] = addr; // Set breakpoint here or inspect 'found'
+      }
+    }
+
+    /* Visual feedback: blink LD2 'n' times (once for each device found) */
+    for (int i = 0; i < n; i++) {
+      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+      HAL_Delay(150);
+      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+      HAL_Delay(150);
+    }
+    HAL_Delay(1000);
+
+#endif
   }
   /* USER CODE END 3 */
 }
@@ -276,14 +357,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LD2_Pin|BTN_1_Pin|BTN_2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, TL2_B_Pin|TL1_A_Pin|TL2_A_Pin|TL1_B_Pin
-                          |BTN_4_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(BTN_3_GPIO_Port, BTN_3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, TL2_B_Pin|TL1_A_Pin|TL2_A_Pin|TL1_B_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -291,17 +368,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD2_Pin BTN_1_Pin BTN_2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin|BTN_1_Pin|BTN_2_Pin;
+  /*Configure GPIO pin : LD2_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TL2_B_Pin TL1_A_Pin TL2_A_Pin TL1_B_Pin
-                           BTN_4_Pin */
-  GPIO_InitStruct.Pin = TL2_B_Pin|TL1_A_Pin|TL2_A_Pin|TL1_B_Pin
-                          |BTN_4_Pin;
+  /*Configure GPIO pins : TL2_B_Pin TL1_A_Pin TL2_A_Pin TL1_B_Pin */
+  GPIO_InitStruct.Pin = TL2_B_Pin|TL1_A_Pin|TL2_A_Pin|TL1_B_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -309,10 +384,21 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : BTN_3_Pin */
   GPIO_InitStruct.Pin = BTN_3_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(BTN_3_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : BTN_1_Pin BTN_2_Pin */
+  GPIO_InitStruct.Pin = BTN_1_Pin|BTN_2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : BTN_4_Pin */
+  GPIO_InitStruct.Pin = BTN_4_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BTN_4_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
