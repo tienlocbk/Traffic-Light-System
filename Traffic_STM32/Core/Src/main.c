@@ -22,6 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "scheduler.h"
 
 /* USER CODE END Includes */
 
@@ -43,8 +44,9 @@
 #define TEST_STEP_3_3  3
 #define TEST_STEP_3_4  4
 
-/* >>> CHANGE THIS VALUE TO SWITCH TESTING STEP (1 to 4) <<< */
-#define TEST_STEP      TEST_STEP_3_1
+/* >>> CHANGE THIS VALUE TO SWITCH TESTING STEP (1 to 5; 5 = scheduler) <<< */
+#define TEST_STEP_4    5
+#define TEST_STEP      TEST_STEP_4
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -77,6 +79,18 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+#if (TEST_STEP == TEST_STEP_4)
+static void Task_Blink(void)
+{
+  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+}
+#endif
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim->Instance == TIM2) SCH_Update();
+}
+
 
 /* USER CODE END 0 */
 
@@ -112,6 +126,15 @@ int main(void)
   MX_I2C1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+#if (TEST_STEP == TEST_STEP_4)
+  SCH_Init();
+  if (SCH_Add_Task(Task_Blink, 50, 50) == NO_TASK_ID) Error_Handler();
+  /* Initialization can leave UIF set: clear it before enabling interrupts. */
+  __HAL_TIM_SET_COUNTER(&htim2, 0);
+  __HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE);
+  if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK) Error_Handler();
+#endif
+
 
   /* USER CODE END 2 */
 
@@ -122,7 +145,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-#if (TEST_STEP == TEST_STEP_3_1)
+#if (TEST_STEP == TEST_STEP_4)
+    SCH_Dispatch_Tasks();
+
+#elif (TEST_STEP == TEST_STEP_3_1)
     /* ------------------------------------------------------------------
      * Step 3.1: Checking Program Flashing: Blink LED PA5 (LD2)
      * ------------------------------------------------------------------ */
@@ -282,7 +308,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 7199;
+  htim2.Init.Prescaler = 6399;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 99;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
