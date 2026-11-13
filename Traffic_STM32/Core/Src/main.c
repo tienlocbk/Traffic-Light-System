@@ -335,7 +335,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-#if (TEST_STEP == TEST_STEP_3_1)
+#if (TEST_STEP == TEST_STEP_4)
+    SCH_Dispatch_Tasks();
+
+#elif (TEST_STEP == TEST_STEP_3_1)
     /* ------------------------------------------------------------------
      * Step 3.1: Checking Program Flashing: Blink LED PA5 (LD2)
      * ------------------------------------------------------------------ */
@@ -501,7 +504,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 7199;
+  htim2.Init.Prescaler = 6399;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 99;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
