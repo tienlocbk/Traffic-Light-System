@@ -22,7 +22,13 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "scheduler.h"
+#include "software_timer.h"
+#include "button.h"
+#include "traffic_light.h"
+#include "dht20.h"
+#include "lcd.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,19 +38,23 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-/* Hardware test steps (from Section 3 of project guide):
+/* Hardware test steps (from Section 3, 4, 5 of project guide):
  * TEST_STEP_3_1: 3.1 Checking Program Flashing: Blink LED PA5
  * TEST_STEP_3_2: 3.2 Determining Signal Combinations for Light Modules
  * TEST_STEP_3_3: 3.3 Testing Buttons (BTN_1 to BTN_4, B1)
  * TEST_STEP_3_4: 3.4 Scanning I2C Devices (DHT20 & LCD)
+ * TEST_STEP_4:   Step 4 O(1) Scheduler verification
+ * TEST_STEP_5:   Step 5 Supporting Modules integrated demo on O(1) Scheduler
  */
 #define TEST_STEP_3_1  1
 #define TEST_STEP_3_2  2
 #define TEST_STEP_3_3  3
 #define TEST_STEP_3_4  4
+#define TEST_STEP_4    5
+#define TEST_STEP_5    6
 
-/* >>> CHANGE THIS VALUE TO SWITCH TESTING STEP (1 to 4) <<< */
-#define TEST_STEP      TEST_STEP_3_1
+/* >>> CHANGE THIS VALUE TO SWITCH TESTING STEP (1 to 6) <<< */
+#define TEST_STEP      TEST_STEP_5
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -63,6 +73,10 @@ UART_HandleTypeDef huart2;
 /* Global variables for Step 3.4 I2C device scan (accessible in Live Expressions) */
 uint8_t found[8];
 int n = 0;
+
+/* Supporting module driver handles for DHT20 and LCD */
+DHT20_t dht20;
+LCD_t   lcd;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,12 +86,169 @@ static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-
+/* Step 5 demo tasks prototypes */
+void task_step5_button_handler(void);
+void task_step5_traffic_cycle(void);
+void task_step5_dht20_lcd(void);
+void task_step5_heartbeat(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+#if (TEST_STEP == TEST_STEP_5)
+/* 
+ * Step 5 Demo Modes:
+ * 0: AUTO MODE   - Cycles traffic lights automatically using software_timer (3s Green, 1s Amber)
+ * 1: MANUAL MODE - User controls lights directly with push buttons to test debouncing and lights
+ */
+static uint8_t demo_mode = 0;           /* 0 = Auto, 1 = Manual */
+static uint8_t demo_traffic_phase = 0;  /* Auto cycle phase: 0..3 */
 
+void task_step5_button_handler(void)
+{
+    /* Button 1 (D7 / PA8): Toggle between AUTO and MANUAL demo mode */
+    if (isButtonPressed(BTN_1_INDEX))
+    {
+        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+        demo_mode = !demo_mode;
+        if (demo_mode == 0)
+        {
+            /* Switched back to AUTO: re-arm software timer */
+            demo_traffic_phase = 0;
+            traffic_set(ROAD_1, RED);
+            traffic_set(ROAD_2, GREEN);
+            setTimer(TIMER_TRAFFIC, 3000);
+        }
+        else
+        {
+            /* Switched to MANUAL: stop auto timer */
+            clearTimer(TIMER_TRAFFIC);
+        }
+    }
+
+    /* Long-press on Button 1 (> 1s): Toggle Amber warning blink */
+    if (isButtonLongPressed(BTN_1_INDEX))
+    {
+        traffic_toggle(ROAD_1, AMBER);
+        traffic_toggle(ROAD_2, AMBER);
+    }
+
+    /* In MANUAL mode, test individual buttons and lights */
+    if (demo_mode == 1)
+    {
+        /* Button 2 (D8 / PA9): Step Road 1 (GREEN -> AMBER -> RED -> OFF) */
+        if (isButtonPressed(BTN_2_INDEX))
+        {
+            TrafficColor next = (TrafficColor)((traffic_get(ROAD_1) + 1) % 4);
+            traffic_set(ROAD_1, next);
+        }
+
+        /* Button 3 (D9 / PC7): Step Road 2 (GREEN -> AMBER -> RED -> OFF) */
+        if (isButtonPressed(BTN_3_INDEX))
+        {
+            TrafficColor next = (TrafficColor)((traffic_get(ROAD_2) + 1) % 4);
+            traffic_set(ROAD_2, next);
+        }
+
+        /* Button 4 (D10 / PB6): Toggle both roads ALL RED / ALL OFF */
+        if (isButtonPressed(BTN_4_INDEX))
+        {
+            if (traffic_get(ROAD_1) == RED && traffic_get(ROAD_2) == RED)
+            {
+                traffic_all_off();
+            }
+            else
+            {
+                traffic_set(ROAD_1, RED);
+                traffic_set(ROAD_2, RED);
+            }
+        }
+    }
+
+    /* Onboard USER Button (PC13): Toggle onboard LED LD2 */
+    if (isButtonPressed(BTN_USER_INDEX))
+    {
+        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+    }
+}
+
+void task_step5_traffic_cycle(void)
+{
+    /* Only auto-cycle in AUTO mode */
+    if (demo_mode != 0)
+    {
+        return;
+    }
+
+    /* Check software timer flag (set by software_timer_run every 10ms) */
+    if (timer_flag[TIMER_TRAFFIC] == 1)
+    {
+        switch (demo_traffic_phase)
+        {
+            case 0: /* Phase 0: Road 1 RED, Road 2 GREEN for 3 seconds */
+                traffic_set(ROAD_1, RED);
+                traffic_set(ROAD_2, GREEN);
+                setTimer(TIMER_TRAFFIC, 3000);
+                demo_traffic_phase = 1;
+                break;
+
+            case 1: /* Phase 1: Road 1 RED, Road 2 AMBER for 1 second */
+                traffic_set(ROAD_1, RED);
+                traffic_set(ROAD_2, AMBER);
+                setTimer(TIMER_TRAFFIC, 1000);
+                demo_traffic_phase = 2;
+                break;
+
+            case 2: /* Phase 2: Road 1 GREEN, Road 2 RED for 3 seconds */
+                traffic_set(ROAD_1, GREEN);
+                traffic_set(ROAD_2, RED);
+                setTimer(TIMER_TRAFFIC, 3000);
+                demo_traffic_phase = 3;
+                break;
+
+            case 3: /* Phase 3: Road 1 AMBER, Road 2 RED for 1 second */
+                traffic_set(ROAD_1, AMBER);
+                traffic_set(ROAD_2, RED);
+                setTimer(TIMER_TRAFFIC, 1000);
+                demo_traffic_phase = 0;
+                break;
+
+            default:
+                demo_traffic_phase = 0;
+                setTimer(TIMER_TRAFFIC, 100);
+                break;
+        }
+    }
+}
+
+void task_step5_dht20_lcd(void)
+{
+    /* Helper names for LCD debug display */
+    static const char *color_names[] = { "OFF", "GRN", "AMB", "RED" };
+
+    if (DHT20_Read(&dht20) == DHT20_OK && lcd.ready)
+    {
+        char line1[17];
+        char line2[17];
+        snprintf(line1, sizeof(line1), "T:%.1fC  H:%.1f%%",
+                 dht20.temperature, dht20.humidity);
+        snprintf(line2, sizeof(line2), "%s R1:%s R2:%s",
+                 (demo_mode == 0) ? "AUTO" : "MANU",
+                 color_names[traffic_get(ROAD_1)],
+                 color_names[traffic_get(ROAD_2)]);
+        LCD_SetCursor(&lcd, 0, 0);
+        LCD_PrintStr(&lcd, line1);
+        LCD_SetCursor(&lcd, 1, 0);
+        LCD_PrintStr(&lcd, line2);
+    }
+}
+
+void task_step5_heartbeat(void)
+{
+    /* Heartbeat blink on PA5 indicates scheduler is active */
+    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+}
+#endif
 /* USER CODE END 0 */
 
 /**
@@ -112,7 +283,49 @@ int main(void)
   MX_I2C1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+#if (TEST_STEP == TEST_STEP_5)
+  /* ------------------------------------------------------------------
+   * Step 5: Supporting Modules Demo running on O(1) Scheduler
+   * ------------------------------------------------------------------ */
+  SCH_Init();
+  software_timer_init();
+  button_init();
+  traffic_init();
 
+  /* Start TIM2 interrupt for scheduler 10 ms ticks */
+  HAL_TIM_Base_Start_IT(&htim2);
+
+  /* Set initial traffic software timer (3 seconds) */
+  setTimer(TIMER_TRAFFIC, 3000);
+
+  /* Register periodic tasks in the O(1) scheduler:
+   * 1. software_timer_run: decrements software timers every 10 ms (1 tick)
+   * 2. button_reading: 3-stage debounces buttons every 10 ms (1 tick)
+   * 3. task_step5_button_handler: checks button presses every 20 ms (2 ticks)
+   * 4. task_step5_traffic_cycle: updates traffic light phases every 50 ms (5 ticks)
+   * 5. task_step5_heartbeat: blinks LD2 every 500 ms (50 ticks)
+   */
+  SCH_Add_Task(software_timer_run, 0, 1);
+  SCH_Add_Task(button_reading, 0, 1);
+  SCH_Add_Task(task_step5_button_handler, 1, 2);
+  SCH_Add_Task(task_step5_traffic_cycle, 2, 5);
+  SCH_Add_Task(task_step5_heartbeat, 3, 50);
+
+  /* Initialize DHT20 and LCD if available */
+  if (LCD_Init(&lcd, &hi2c1, LCD_I2C_ADDRESS, 16, 2) == HAL_OK) {
+      LCD_Clear(&lcd);
+      LCD_SetCursor(&lcd, 0, 0);
+      LCD_PrintStr(&lcd, "Step 5 Running");
+  }
+  DHT20_Init(&dht20, &hi2c1);
+  SCH_Add_Task(task_step5_dht20_lcd, 50, 200); /* Update every 2 seconds */
+
+#elif (TEST_STEP == TEST_STEP_4)
+  /* Step 4: O(1) Scheduler verification */
+  HAL_TIM_Base_Start_IT(&htim2);
+  SCH_Init();
+  SCH_Add_Task(task_step5_heartbeat, 0, 50);
+#endif
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -186,6 +399,12 @@ int main(void)
       HAL_Delay(150);
     }
     HAL_Delay(1000);
+
+#elif (TEST_STEP == TEST_STEP_5 || TEST_STEP == TEST_STEP_4)
+    /* ------------------------------------------------------------------
+     * Steps 4 & 5: Dispatch ready tasks from the O(1) scheduler queue
+     * ------------------------------------------------------------------ */
+    SCH_Dispatch_Tasks();
 
 #endif
   }
@@ -408,6 +627,13 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim->Instance == TIM2)
+  {
+    SCH_Update();
+  }
+}
 /* USER CODE END 4 */
 
 /**
