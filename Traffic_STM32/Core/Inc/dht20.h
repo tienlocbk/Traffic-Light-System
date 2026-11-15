@@ -13,8 +13,8 @@
  *   - Humidity    [%RH] = raw_h / 2^20 * 100
  *   - Temperature [degC] = raw_t / 2^20 * 200 - 50
  *
- * NOTE: DHT20_Read() blocks ~80 ms (HAL_Delay). Call it from the main loop,
- *       NOT from an interrupt handler.
+ * NOTE: DHT20_Read() is cooperative. One call starts a measurement and a
+ *       later call collects its result, so it does not block the scheduler.
  */
 #ifndef DHT20_H
 #define DHT20_H
@@ -51,6 +51,7 @@ typedef struct
 
     uint32_t last_read_tick;     /* HAL_GetTick() of last measurement      */
     uint8_t  has_read;           /* 0 until the first measurement started  */
+    uint8_t  measuring;          /* conversion is in progress              */
     uint8_t  status;             /* status byte of last measurement        */
     uint8_t  raw[7];             /* raw bytes of last measurement          */
 } DHT20_t;
@@ -67,8 +68,9 @@ int  DHT20_Init(DHT20_t *dev, I2C_HandleTypeDef *hi2c);
 uint8_t DHT20_IsConnected(DHT20_t *dev);
 
 /**
- * @brief  Trigger a measurement, wait for it, read + convert + CRC check.
- *         Safe to call often: if called again before
+ * @brief  Start or poll a measurement, read + convert + CRC check.
+ *         Safe to call from a periodic scheduler task: the trigger and
+ *         result collection happen on separate calls. If called again before
  *         DHT20_MIN_READ_INTERVAL_MS has elapsed it returns
  *         DHT20_ERROR_LASTREAD immediately and keeps the previous values.
  * @retval DHT20_OK or one of the DHT20_ERROR_* codes
