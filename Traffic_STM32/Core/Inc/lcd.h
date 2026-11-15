@@ -19,13 +19,9 @@ extern "C" {
 #include <stdint.h>
 
 /* ------------------------------------------------------------------ */
-/* LCD I2C ADDRESS  (7-bit, NOT shifted)                               */
-/* TODO: fill in the real address of your LCD backpack.                */
-/*       (Typical PCF8574: 0x20..0x27, PCF8574A: 0x38..0x3F)           */
-/*       Do NOT use 0x38 if the DHT20 is on the same bus -- that is    */
-/*       the DHT20's address.                                          */
+/* LCD I2C ADDRESS  (7-bit, NOT shifted)                                          */
 /* ------------------------------------------------------------------ */
-#define LCD_I2C_ADDRESS     0x00U    /* <-- TODO: LCD ADDRESS */
+#define LCD_I2C_ADDRESS     0x21U
 
 /* Default geometry */
 #define LCD_COLS            16U
