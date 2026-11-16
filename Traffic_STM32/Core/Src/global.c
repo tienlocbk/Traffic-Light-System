@@ -15,8 +15,8 @@ void traffic_phase_enter(traffic_phase_t phase)
         traffic.road2 = LIGHT_AMBER;
         break;
     case GREEN1_RED2:
-        traffic.road1 = LIGHT_GREEN;
         traffic.road2 = LIGHT_RED;
+        traffic.road1 = LIGHT_GREEN;
         break;
     case AMBER1_RED2:
         traffic.road1 = LIGHT_AMBER;
