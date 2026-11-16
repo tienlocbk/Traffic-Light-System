@@ -1,17 +1,15 @@
 #ifndef INC_BUTTON_H_
 #define INC_BUTTON_H_
 
-#include "main.h"
 #include <stdint.h>
 
-#define NUM_BUTTONS            5
+#define NUM_BUTTONS            4
 
 /* Button indices */
 #define BTN_1_INDEX            0   /* D7  - PA8  (Mode) */
 #define BTN_2_INDEX            1   /* D8  - PA9  (Manual / Adjust) */
-#define BTN_3_INDEX            2   /* D9  - PC7  (Set) */
-#define BTN_4_INDEX            3   /* D10 - PB6  (Cancel / Confirm) */
-#define BTN_USER_INDEX         4   /* Onboard B1 - PC13 */
+#define BTN_3_INDEX            2   /* D9  - PC7  (Increase in tuning) */
+#define BTN_4_INDEX            3   /* D10 - PB6  (Decrease in tuning) */
 
 #define BTN_MODE               BTN_1_INDEX
 #define BTN_SELECT             BTN_2_INDEX
@@ -21,7 +19,10 @@
 /* 100 ticks * 10ms = 1 second for long press */
 #define TICKS_FOR_LONG_PRESS   100
 
-/* Initialize button buffers */
+/* All APIs run in main/scheduler context, not in interrupts.
+ * Pins are active-low, matching the current hardware test.
+ * Initialize after GPIO setup and before scheduling button_reading().
+ */
 void button_init(void);
 
 /* Read pins and debounce, called every 10ms by scheduler */
@@ -30,7 +31,15 @@ void button_reading(void);
 /* Check if button was pressed (returns 1 and clears flag) */
 uint8_t isButtonPressed(uint8_t index);
 
-/* Check if button is held for more than 1 second */
+/* Consume external BTN_1..4 press flags as bits 0..3 (FSM_B1..FSM_B4).
+ * USER is excluded. Use this OR isButtonPressed() for each external event;
+ * consuming through either API clears the same flag. Events coalesce until read.
+ */
+uint8_t button_press_events(void);
+
+/* Consume a separate event once after 100 further held samples (1 second)
+ * following the debounced press. No automatic repeats during a hold.
+ */
 uint8_t isButtonLongPressed(uint8_t index);
 
 /* Get current debounced state (1 if pressed, 0 if released) */

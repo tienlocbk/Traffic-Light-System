@@ -6,7 +6,7 @@
 /* State numbers match the four pages in traffic_light_state_machines(1).drawio. */
 typedef enum { MODE_AUTO, MODE_MANUAL, MODE_TUNING, MODE_SWITCH_SAFE } traffic_mode_t;
 typedef enum { RED1_GREEN2, RED1_AMBER2, GREEN1_RED2, AMBER1_RED2 } traffic_phase_t;
-typedef enum { SET_RED, SET_GREEN, SET_AMBER } tuning_state_t;
+typedef enum { SET_GREEN, SET_AMBER } tuning_state_t;
 typedef enum { LIGHT_RED, LIGHT_GREEN, LIGHT_AMBER } traffic_color_t;
 typedef struct { uint8_t red, green, amber; } traffic_timings_t;
 
@@ -28,7 +28,6 @@ typedef struct {
     traffic_color_t road1;
     traffic_color_t road2;
     uint32_t remaining_ms;
-    uint8_t validation_error;
 } traffic_state_t;
 
 /* Main/scheduler context only. Drivers read this state; FSMs own its writes. */

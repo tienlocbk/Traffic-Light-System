@@ -10,8 +10,7 @@
 
 #define DHT20_STATUS_BUSY      0x80U
 #define DHT20_STATUS_CAL_MASK  0x18U
-#define DHT20_MEASURE_WAIT_MS  80U
-#define DHT20_BUSY_RETRIES     5U
+#define DHT20_MEASURE_WAIT_MS 80U
 
 /* ------------------------------------------------------------------ */
 /* Private helpers                                                     */
@@ -134,39 +133,42 @@ int DHT20_Read(DHT20_t *dev)
 {
     uint32_t now = HAL_GetTick();
 
-    /* Rate limit: don't hit the sensor continuously */
-    if (dev->has_read && (uint32_t)(now - dev->last_read_tick) < DHT20_MIN_READ_INTERVAL_MS)
-        return DHT20_ERROR_LASTREAD;
-
-    dev->has_read = 1;
-    dev->last_read_tick = now;
-
-    /* 1) trigger measurement */
-    const uint8_t cmd[3] = { 0xAC, 0x33, 0x00 };
-    if (HAL_I2C_Master_Transmit(dev->hi2c, DHT20_ADDR_8BIT, (uint8_t *)cmd, 3,
-                                DHT20_I2C_TIMEOUT_MS) != HAL_OK)
-        return DHT20_ERROR_CONNECT;
-
-    /* 2) wait for conversion (datasheet: 80 ms) */
-    HAL_Delay(DHT20_MEASURE_WAIT_MS);
-
-    /* 3) read 7 bytes, retry while the busy bit (bit 7 of status) is set */
-    uint8_t attempt;
-    for (attempt = 0; attempt < DHT20_BUSY_RETRIES; attempt++)
+    if (!dev->measuring)
     {
-        if (HAL_I2C_Master_Receive(dev->hi2c, DHT20_ADDR_8BIT, dev->raw, 7,
-                                   DHT20_I2C_TIMEOUT_MS) != HAL_OK)
+        /* Rate limit real measurements without delaying the scheduler. */
+        if (dev->has_read &&
+            (uint32_t)(now - dev->last_read_tick) < DHT20_MIN_READ_INTERVAL_MS)
+            return DHT20_ERROR_LASTREAD;
+
+        const uint8_t cmd[3] = { 0xAC, 0x33, 0x00 };
+        if (HAL_I2C_Master_Transmit(dev->hi2c, DHT20_ADDR_8BIT,
+                                    (uint8_t *)cmd, 3,
+                                    DHT20_I2C_TIMEOUT_MS) != HAL_OK)
             return DHT20_ERROR_CONNECT;
 
-        if ((dev->raw[0] & DHT20_STATUS_BUSY) == 0)
-            break;
-
-        HAL_Delay(10);
+        dev->has_read = 1;
+        dev->last_read_tick = now;
+        dev->measuring = 1;
+        return DHT20_ERROR_BUSY;
     }
-    if (attempt == DHT20_BUSY_RETRIES)
+
+    /* The conversion takes at least 80 ms. Poll on a later task invocation. */
+    if ((uint32_t)(now - dev->last_read_tick) < DHT20_MEASURE_WAIT_MS)
         return DHT20_ERROR_BUSY;
 
-    /* 4) sanity check + convert */
+    if (HAL_I2C_Master_Receive(dev->hi2c, DHT20_ADDR_8BIT, dev->raw, 7,
+                               DHT20_I2C_TIMEOUT_MS) != HAL_OK)
+    {
+        dev->measuring = 0;
+        return DHT20_ERROR_CONNECT;
+    }
+
+    if ((dev->raw[0] & DHT20_STATUS_BUSY) != 0)
+        return DHT20_ERROR_BUSY;
+
+    dev->measuring = 0;
+
+    /* Sanity check + convert. */
     uint8_t all_zero = 1;
     for (uint8_t i = 0; i < 7; i++)
     {
