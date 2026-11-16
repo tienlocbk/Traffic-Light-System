@@ -30,6 +30,9 @@
 #include "global.h"
 #include "fsm_mode.h"
 #include <stdio.h>
+#ifdef TRAFFIC_LED_PIN_PROBE
+void led_pin_probe(LCD_t *display);
+#endif
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -144,11 +147,22 @@ static void task_buttons(void)
     if (events != 0U) fsm_mode_post_buttons(events);
 }
 
+static void apply_traffic_outputs(void)
+{
+    /* Finish setting the stopping road to RED before enabling the other. */
+    if (traffic.road1 == LIGHT_RED) {
+        traffic_set(ROAD_1, to_driver_color(traffic.road1));
+        traffic_set(ROAD_2, to_driver_color(traffic.road2));
+    } else {
+        traffic_set(ROAD_2, to_driver_color(traffic.road2));
+        traffic_set(ROAD_1, to_driver_color(traffic.road1));
+    }
+}
+
 static void task_fsm(void)
 {
     fsm_mode_run();
-    traffic_set(ROAD_1, to_driver_color(traffic.road1));
-    traffic_set(ROAD_2, to_driver_color(traffic.road2));
+    apply_traffic_outputs();
 }
 
 static void task_lcd_sensor(void)
@@ -169,8 +183,10 @@ static void task_lcd_sensor(void)
     }
     else if (traffic.mode == MODE_AUTO)
     {
-        snprintf(line2, sizeof(line2), "AUTO R:%02u G:%02u",
-                 traffic_countdown(1U), traffic_countdown(2U));
+        /* Labels follow Road 1 and Road 2, including both amber phases. */
+        snprintf(line2, sizeof(line2), "AUTO %c:%02u %c:%02u",
+                 color_initial(traffic.road1), traffic_countdown(1U),
+                 color_initial(traffic.road2), traffic_countdown(2U));
     }
     else
     {
@@ -225,8 +241,12 @@ int main(void)
   button_init();
   traffic_init();
   fsm_mode_init();
+  apply_traffic_outputs();
 
   LCD_Init(&lcd, &hi2c1, LCD_I2C_ADDRESS, LCD_COLS, LCD_ROWS);
+#ifdef TRAFFIC_LED_PIN_PROBE
+  led_pin_probe(&lcd);
+#endif
   DHT20_Init(&dht20, &hi2c1);
 
   HAL_TIM_Base_Start_IT(&htim2);
