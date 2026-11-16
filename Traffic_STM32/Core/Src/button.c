@@ -10,16 +10,14 @@ static GPIO_TypeDef * const button_ports[NUM_BUTTONS] = {
     BTN_1_GPIO_Port,
     BTN_2_GPIO_Port,
     BTN_3_GPIO_Port,
-    BTN_4_GPIO_Port,
-    B1_GPIO_Port
+    BTN_4_GPIO_Port
 };
 
 static const uint16_t button_pins[NUM_BUTTONS] = {
     BTN_1_Pin,
     BTN_2_Pin,
     BTN_3_Pin,
-    BTN_4_Pin,
-    B1_Pin
+    BTN_4_Pin
 };
 
 /* 3-stage debouncing shift buffers */

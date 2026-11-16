@@ -26,9 +26,12 @@
 #include "software_timer.h"
 #include "button.h"
 #include "traffic_light.h"
+
+/* --------- DHT20 & LCD --------- */
 #include "dht20.h"
 #include "lcd.h"
 #include <stdio.h>
+/* ------------------------------- */
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -74,9 +77,10 @@ UART_HandleTypeDef huart2;
 uint8_t found[8];
 int n = 0;
 
-/* Supporting module driver handles for DHT20 and LCD */
+/* --------- DHT20 & LCD --------- */
 DHT20_t dht20;
 LCD_t   lcd;
+/* ------------------------------- */
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -89,8 +93,11 @@ static void MX_TIM2_Init(void);
 /* Step 5 demo tasks prototypes */
 void task_step5_button_handler(void);
 void task_step5_traffic_cycle(void);
-void task_step5_dht20_lcd(void);
 void task_step5_heartbeat(void);
+
+/* --------- DHT20 & LCD --------- */
+/* void task_step5_dht20_lcd(void); */
+/* ------------------------------- */
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -165,11 +172,13 @@ void task_step5_button_handler(void)
         }
     }
 
-    /* Onboard USER Button (PC13): Toggle onboard LED LD2 */
+    /* Onboard USER Button (PC13): commented out as B1 was removed */
+    /*
     if (isButtonPressed(BTN_USER_INDEX))
     {
         HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
     }
+    */
 }
 
 void task_step5_traffic_cycle(void)
@@ -221,9 +230,10 @@ void task_step5_traffic_cycle(void)
     }
 }
 
+/* --------- DHT20 & LCD --------- */
+/*
 void task_step5_dht20_lcd(void)
 {
-    /* Helper names for LCD debug display */
     static const char *color_names[] = { "OFF", "GRN", "AMB", "RED" };
 
     if (DHT20_Read(&dht20) == DHT20_OK && lcd.ready)
@@ -242,6 +252,8 @@ void task_step5_dht20_lcd(void)
         LCD_PrintStr(&lcd, line2);
     }
 }
+*/
+/* ------------------------------- */
 
 void task_step5_heartbeat(void)
 {
@@ -311,14 +323,17 @@ int main(void)
   SCH_Add_Task(task_step5_traffic_cycle, 2, 5);
   SCH_Add_Task(task_step5_heartbeat, 3, 50);
 
-  /* Initialize DHT20 and LCD if available */
+  /* --------- DHT20 & LCD --------- */
+  /*
   if (LCD_Init(&lcd, &hi2c1, LCD_I2C_ADDRESS, 16, 2) == HAL_OK) {
       LCD_Clear(&lcd);
       LCD_SetCursor(&lcd, 0, 0);
       LCD_PrintStr(&lcd, "Step 5 Running");
   }
   DHT20_Init(&dht20, &hi2c1);
-  SCH_Add_Task(task_step5_dht20_lcd, 50, 200); /* Update every 2 seconds */
+  SCH_Add_Task(task_step5_dht20_lcd, 50, 200); // Update every 2 seconds
+  */
+  /* ------------------------------- */
 
 #elif (TEST_STEP == TEST_STEP_4)
   /* Step 4: O(1) Scheduler verification */

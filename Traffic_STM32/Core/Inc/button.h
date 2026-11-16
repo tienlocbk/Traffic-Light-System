@@ -4,14 +4,13 @@
 #include "main.h"
 #include <stdint.h>
 
-#define NUM_BUTTONS            5
+#define NUM_BUTTONS            4
 
 /* Button indices */
 #define BTN_1_INDEX            0   /* D7  - PA8  (Mode) */
 #define BTN_2_INDEX            1   /* D8  - PA9  (Manual / Adjust) */
 #define BTN_3_INDEX            2   /* D9  - PC7  (Set) */
 #define BTN_4_INDEX            3   /* D10 - PB6  (Cancel / Confirm) */
-#define BTN_USER_INDEX         4   /* Onboard B1 - PC13 */
 
 #define BTN_MODE               BTN_1_INDEX
 #define BTN_SELECT             BTN_2_INDEX
