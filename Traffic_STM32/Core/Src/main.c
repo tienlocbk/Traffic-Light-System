@@ -33,6 +33,9 @@
 #ifdef TRAFFIC_LED_PIN_PROBE
 void led_pin_probe(LCD_t *display);
 #endif
+#ifdef TRAFFIC_LED_LIVE_TRACE
+void led_live_trace(LCD_t *display);
+#endif
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -94,6 +97,7 @@ static void lcd_print_line(uint8_t row, const char *text)
     LCD_PrintString(&lcd, line);
 }
 
+#ifndef TRAFFIC_LED_LIVE_TRACE
 static void lcd_print_environment(void)
 {
     LCD_SetCursor(&lcd, 0, 0);
@@ -104,6 +108,7 @@ static void lcd_print_environment(void)
     LCD_PrintString(&lcd, "C H:");
     LCD_PrintFloat(&lcd, dht20.humidity, 1);
 }
+#endif
 
 static TrafficColor to_driver_color(traffic_color_t color)
 {
@@ -195,7 +200,11 @@ static void task_lcd_sensor(void)
                  color_initial(traffic.road2));
     }
 
+#ifdef TRAFFIC_LED_LIVE_TRACE
+    led_live_trace(&lcd);
+#else
     lcd_print_environment();
+#endif
     lcd_print_line(1, line2);
 }
 
